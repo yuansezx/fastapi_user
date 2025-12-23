@@ -1,0 +1,39 @@
+"""main_app初始化"""
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+
+from app.core.exceptions import global_exception_handler
+from app.core.settings import GLOBAL_SETTINGS
+from app import core
+
+
+
+
+# fastapi 生命周期管理
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await core.start(app)
+
+    yield
+
+    await core.stop(app)
+
+
+def create_app():
+    app = FastAPI(title='基于角色的权限管理', lifespan=lifespan)
+    # 注册全局异常处理函数
+    app.add_exception_handler(Exception, global_exception_handler)
+
+    # cors
+    app.add_middleware(CORSMiddleware, allow_origins=GLOBAL_SETTINGS.cors_allowed_origins, allow_credentials=True,
+                       allow_methods=["*"], allow_headers=["*"])
+    # 挂载路由
+    # app.include_router(user_router, prefix="/api/users", tags=["user"])
+
+    return app
+
+
+main_app = create_app()
