@@ -1,10 +1,8 @@
 # 依赖注入
 from redis import asyncio as aioredis
-from fastapi import Request
 
+from app.core.redis_manager import redis_manager
 
-class AppCache:
-    # 获取redis连接池
-    @staticmethod
-    def get_redis_conn(request: Request) -> aioredis.Redis:
-        return request.app.state.redis_pool
+"""基础层依赖"""
+def get_redis_conn() -> aioredis.Redis:
+    return redis_manager.redis_pool

@@ -1,13 +1,12 @@
 import sys
 
 from aerich import Command
-from fastapi import FastAPI
 from loguru import logger
 from tortoise import Tortoise
-from redis import asyncio as aioredis
 
 from app.core.settings import GLOBAL_SETTINGS
-from app import user
+from app.core.redis_manager import redis_manager
+
 
 
 # 初始化loguru
@@ -50,10 +49,11 @@ async def init_db() -> None:
 
 # 初始化模块
 async def register_modules() -> None:
+    from app import user
     await user.register_module()
 
 # 启动
-async def start(app: FastAPI) -> None:
+async def start() -> None:
     """app启动的初始化准备"""
     # 初始化日志
     init_logger()
@@ -64,21 +64,20 @@ async def start(app: FastAPI) -> None:
     else:
         await Tortoise.init(config=GLOBAL_SETTINGS.tortoise_orm_config)
         logger.info('orm初始化 完成。')
+    # 初始化redis连接池
+    redis_manager.create_pool()
     # 注册模块
     await register_modules()
     # 判断是否需要初始化超级管理员
     if GLOBAL_SETTINGS.need_init_admin:
+        from app import user
         await user.init_superadmin()
-    # 初始化redis连接池，存入app.state
-    app.state.redis_pool = aioredis.Redis(**GLOBAL_SETTINGS.redis_config)
-    logger.info('redis连接池初始化完成。')
 
 # 关闭
-async def stop(app: FastAPI) -> None:
+async def stop() -> None:
     """app关闭的收尾工作"""
     # 关闭redis连接池
-    await app.state.redis_pool.close()
-    logger.info('关闭redis连接池。')
+    await redis_manager.close_pool()
     # 关闭数据库连接
     await Tortoise.close_connections()
     logger.info('关闭orm数据库连接。')

@@ -10,16 +10,18 @@ from app.core.settings import GLOBAL_SETTINGS
 from app import core
 
 
-
-
 # fastapi 生命周期管理
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await core.start(app)
+    await core.start()
+
+    # 挂载路由
+    from app.user.router import user_router
+    app.include_router(user_router, prefix="/api/users", tags=["user"])
 
     yield
 
-    await core.stop(app)
+    await core.stop()
 
 
 def create_app():
@@ -30,8 +32,6 @@ def create_app():
     # cors
     app.add_middleware(CORSMiddleware, allow_origins=GLOBAL_SETTINGS.cors_allowed_origins, allow_credentials=True,
                        allow_methods=["*"], allow_headers=["*"])
-    # 挂载路由
-    # app.include_router(user_router, prefix="/api/users", tags=["user"])
 
     return app
 

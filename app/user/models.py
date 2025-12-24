@@ -20,16 +20,6 @@ class User(Model):
     updated_by = fields.ForeignKeyField('models.User', null=True, on_delete=fields.RESTRICT,
                                         related_name='updated_users')
 
-    # def to_schema(self):
-    #     return UserSchema(id=self.id,
-    #                       username=self.username,
-    #                       nickname=self.nickname,
-    #                       created_at=self.created_at,
-    #                       updated_at=self.updated_at,
-    #                       last_login_at=self.last_login_at,
-    #                       created_by_id=self.created_by_id,
-    #                       updated_by_id=self.updated_by_id)
-
 
 class Role(Model):
     """角色表"""
@@ -41,14 +31,6 @@ class Role(Model):
     created_at = fields.DatetimeField(auto_now_add=True)
     created_by = fields.ForeignKeyField('models.User', on_delete=fields.RESTRICT, related_name='created_roles')
 
-    # def to_dict(self):
-    #     return {
-    #         'id': self.id,
-    #         'name': self.name,
-    #         'description': self.description,
-    #         'created_at': self.created_at,
-    #         'created_by': self.created_by
-    #     }
 
 
 class User_Role(Model):

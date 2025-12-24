@@ -1,6 +1,6 @@
-from app.core.service.schemas import RegisterModuleIn_PermissionsSchema, RegisterModuleInSchema
-from app.core.service.service import module_service
-from app.user.service.service import user_service
+from app.core.schemas import RegisterModuleIn_PermissionsSchema, RegisterModuleInSchema
+from app.core.service import module_service
+
 
 
 # 注册模块
@@ -15,4 +15,5 @@ async def register_module():
 
 # 初始化超级管理员
 async def init_superadmin():
+    from app.user.service import user_service
     await user_service.init_superadmin()
