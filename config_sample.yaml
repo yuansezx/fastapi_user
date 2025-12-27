@@ -1,0 +1,58 @@
+cors_allowed_origins: []
+
+# jwt设置
+jwt_secret_key:
+
+jwt_token_expire_minutes: 120
+
+# 是否需要初始化数据库表
+need_init_db: True
+
+# orm连接信息
+tortoise_orm_config:
+  connections:
+    postgres:
+      engine: "tortoise.backends.asyncpg"
+      credentials:
+        host:  # Database host address
+        port:   # Database port
+        user:   # Database username
+        password:   # Database password
+        database:   # Database name
+      timezone: 'Asia/Shanghai'
+#    sqlite:
+#      engine: "tortoise.backends.sqlite"
+#      credentials:
+#        file_path: "./db.sqlite3"  # Path to SQLite database file
+#      timezone: 'Asia/Shanghai'
+#    mysql:
+#      engine: "tortoise.backends.mysql"
+#      credentials:
+#        host:  # Database host address
+#        port:   # Database port
+#        user:   # Database username
+#        password:   # Database password
+#        database:   # Database name
+#      timezone: 'Asia/Shanghai'
+  apps:
+    models:
+      models: [ 'app.core.models','app.user.models', 'aerich.models' ]
+      default_connection: postgres
+  use_tz: True  # 是否使用时区
+  timezone: 'Asia/Shanghai'  # 默认时区
+  db_pool:
+    max_size: 10
+    min_size: 1
+    idle_timeout: 30  # 空闲连接超时
+
+# redis
+redis_config:
+  host:
+  port:
+  db: 0
+  password:
+  encoding: utf-8
+  max_connections: 100
+
+
+

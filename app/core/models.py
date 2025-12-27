@@ -8,6 +8,14 @@ class Module(Model):
     name = fields.CharField(max_length=20)
     description = fields.CharField(max_length=100, null=True)
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "code": self.code,
+            "name": self.name,
+            "description": self.description
+        }
+
 
 class Permission(Model):
     """权限表"""
@@ -19,3 +27,12 @@ class Permission(Model):
 
     class Meta:
         unique_together = ("module", "code")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "code": self.code,
+            "name": self.name,
+            "description": self.description,
+            "module_id": self.module_id
+        }

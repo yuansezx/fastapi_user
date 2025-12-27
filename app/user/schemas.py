@@ -3,14 +3,18 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
-class CurrentUser(BaseModel):
-    token: str
-    payload: dict
-    user_id: int
-    username: str
+
+"""服务层schemas"""
+
+
 
 
 """路由层schemas"""
+
+
 class UserLoginResSchema(BaseModel):
+    id: int
     username: str
     last_login_at: datetime | None
+    roles: list
+    permissions: list

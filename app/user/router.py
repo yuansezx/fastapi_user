@@ -15,17 +15,22 @@ user_router = APIRouter()
                              403: {'model': FailResSchema, 'description': 'detail="用户账号不可用，请联系管理员。"'}})
 async def login(response: Response, username: str = Body(), password: str = Body()):
     try:
-        token, last_login_at = await user_service.login(username, password)
+        current_user = await user_service.login(username, password)
     except UserInactiveError:
         raise HTTPException(403, '用户账号不可用，请联系管理员。')
     except UserNotFoundError or UserPasswordIncorrectError:
         raise HTTPException(401, '用户名或密码错误。')
     # 设置cookie
-    response.set_cookie('token', token, samesite='none', secure=True)
-    return UserLoginResSchema(username=username, last_login_at=last_login_at)
+    response.set_cookie('token', current_user.token, samesite='none', secure=True)
+    return UserLoginResSchema(**current_user.model_dump())
 
 
 @user_router.post('/logout',summary='用户注销',status_code=204)
 async def logout(response: Response,current_user=Depends(get_current_user('user',''))):
     await user_service.logout(current_user)
     response.delete_cookie('token')
+
+@user_router.post('test',summary='测试')
+async def test(current_user=Depends(get_current_user('user','read'))):
+    return current_user
+

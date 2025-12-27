@@ -20,17 +20,18 @@ class ModuleService:
                                                    code=permission.code)
         logger.info(f'注册{module.name} 完成。')
 
+    async def get_all_permission_ids(self)->list[int]:
+        """获取所有权限数据"""
+        return await self.Permission.all().values_list('id', flat=True)
+
     async def get_all_modules_with_permissions(self) -> list[Module]:
+        """获取所有模块数据及其所有权限"""
         return await self.Module.all().prefetch_related('permissions')
 
-    # async def get_permission_queryset(self, module_code: str, permission_code: str):
-    #     """
-    #     获取code对应的权限表queryset
-    #     :param module_code: 模块码
-    #     :param permission_code: 权限码
-    #     :return: queryset
-    #     """
-    #     queryset = self.Permission.filter(module__code=module_code, permission_code=permission_code)
+    async def get_permissions_with_modules_by_roles(self, roles: list) -> list[Permission]:
+        role_ids = [role.id for role in roles]
+        return await self.Permission.filter(role_assignments__role_id__in=role_ids).select_related(
+            'module').distinct().all()
 
 
 module_service = ModuleService()

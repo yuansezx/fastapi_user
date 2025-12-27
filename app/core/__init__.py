@@ -68,10 +68,9 @@ async def start() -> None:
     redis_manager.create_pool()
     # 注册模块
     await register_modules()
-    # 判断是否需要初始化超级管理员
-    if GLOBAL_SETTINGS.need_init_admin:
-        from app import user
-        await user.init_superadmin()
+    # 初始化超管
+    from app import user
+    await user.init_superadmin()
 
 # 关闭
 async def stop() -> None:

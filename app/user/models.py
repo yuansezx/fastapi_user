@@ -31,6 +31,15 @@ class Role(Model):
     created_at = fields.DatetimeField(auto_now_add=True)
     created_by = fields.ForeignKeyField('models.User', on_delete=fields.RESTRICT, related_name='created_roles')
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'is_system': self.is_system,
+            'created_at': self.created_at,
+            'created_by_id': self.created_by_id
+        }
 
 
 class User_Role(Model):

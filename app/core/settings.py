@@ -41,8 +41,6 @@ class GlobalSettings(BaseSettings):
 
     # 是否需要初始化数据库
     need_init_db: bool = True
-    # 是否需要初始化超级管理员
-    need_init_admin: bool = True
 
     # log文件位置
     logs_path: Path = Path('./logs')
