@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Response, Body, HTTPException
+from fastapi import APIRouter, Response, Body, HTTPException, status
 from fastapi.params import Depends
 
 from app.core.schemas import FailResSchema
 from app.user.service import user_service
 from app.user.dependencies import get_current_user
-from app.user.exceptions import UserInactiveError, UserPasswordIncorrectError, UserNotFoundError
-from app.user.schemas import UserLoginResSchema
+from app.user.exceptions import UserInactiveError, UserPasswordIncorrectError, UserNotFoundError, UsernameExistedError
+from app.user.schemas import UserLoginResSchema, CreateUserReqSchema, CreateUserResSchema
 
 user_router = APIRouter()
 
@@ -30,7 +30,24 @@ async def logout(response: Response,current_user=Depends(get_current_user('user'
     await user_service.logout(current_user)
     response.delete_cookie('token')
 
-@user_router.post('test',summary='测试')
+@user_router.post('',summary='创建用户',status_code=status.HTTP_201_CREATED,response_model=CreateUserResSchema,
+                  responses={400: {'model': FailResSchema,'description':"detail:'用户名已存在。'"}})
+async def create_user(data:CreateUserReqSchema, current_user=Depends(get_current_user('user', 'create'))):
+    try:
+        user_id=await user_service.create_user(data,current_user)
+    except UsernameExistedError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,'用户名已存在。')
+    return CreateUserResSchema(user_id=user_id)
+
+@user_router.delete('/{user_id}',summary='删除单个用户',status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(user_id:int,current_user=Depends(get_current_user('user', 'delete'))):
+    await user_service.delete_users([user_id],current_user)
+
+@user_router.delete('',summary='删除多个用户',status_code=status.HTTP_204_NO_CONTENT)
+async def delete_users(user_ids:list[int]=Body(), current_user=Depends(get_current_user('user', 'delete'))):
+    await user_service.delete_users(user_ids,current_user)
+
+@user_router.post('/test',summary='测试')
 async def test(current_user=Depends(get_current_user('user','read'))):
     return current_user
 

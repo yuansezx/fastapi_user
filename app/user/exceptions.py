@@ -9,3 +9,6 @@ class UserPasswordIncorrectError(Exception):
 
 class UserInactiveError(Exception):
     pass
+
+class UsernameExistedError(Exception):
+    pass

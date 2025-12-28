@@ -1,4 +1,3 @@
-
 from datetime import datetime
 
 from loguru import logger
@@ -9,8 +8,9 @@ from app.core.redis_manager import redis_manager
 from app.core.settings import GLOBAL_SETTINGS
 from app.core.service import module_service
 from app.user.domain_models import RoleDM, CurrentUserDM
-from app.user.exceptions import UserNotFoundError, UserPasswordIncorrectError, UserInactiveError
+from app.user.exceptions import UserNotFoundError, UserPasswordIncorrectError, UserInactiveError, UsernameExistedError
 from app.user.models import User, Role, User_Role, Role_Permission
+from app.user.schemas import CreateUserInSchema
 from app.user.utils import password_hash
 from app.user.utils.jwt_wrapper import jwt_wrapper
 
@@ -40,24 +40,25 @@ class UserService:
             # 连接超管用户和角色
             await self.User_Role.update_or_create(user=user, role=role)
         # 赋予超管所有权限，因为模块权限可能会随更新变化，所以每次启动都需要运行
-        role_id=await self.Role.get(name='superadmin').values_list('id',flat=True)
+        role_id = await self.Role.get(name='superadmin').values_list('id', flat=True)
         # 获取所有权限
         permission_ids = await module_service.get_all_permission_ids()
         await self.grant_permissions_to_role_by_ids(role_id, permission_ids)
         logger.info('初始化超级管理员 完成。')
 
     # 赋予角色权限
-    async def grant_permissions_to_role_by_ids(self, role_id,permission_ids:list[int]):
-        old_permission_ids = set(await self.Role_Permission.filter(role_id=role_id).values_list('permission_id',flat=True))
-        target_permission_ids =set(permission_ids)
+    async def grant_permissions_to_role_by_ids(self, role_id, permission_ids: list[int]):
+        old_permission_ids = set(
+            await self.Role_Permission.filter(role_id=role_id).values_list('permission_id', flat=True))
+        target_permission_ids = set(permission_ids)
         to_add_ids = target_permission_ids - old_permission_ids
         to_remove_ids = old_permission_ids - target_permission_ids
         if to_remove_ids:
-            await self.Role_Permission.filter(role_id=role_id,permission_id__in=to_remove_ids).delete()
+            await self.Role_Permission.filter(role_id=role_id, permission_id__in=to_remove_ids).delete()
         if to_add_ids:
-            new_assignments = [Role_Permission(role_id=role_id,permission_id=permission_id) for permission_id in to_add_ids]
+            new_assignments = [Role_Permission(role_id=role_id, permission_id=permission_id) for permission_id in
+                               to_add_ids]
             await self.Role_Permission.bulk_create(new_assignments)
-
 
     # 读取user拥有的所有角色
     async def get_roles_by_user(self, user: User):
@@ -67,27 +68,37 @@ class UserService:
     # 通过数据库核查权限
     async def verify_permission_by_db(self, user_id: int, module_code: str, permission_code: str) -> bool:
         """
-        通过数据库核查权限
-        :param user_id: 用户id
-        :param module_code: 模块码
-        :param permission_code: 权限码
-        :return:
+
+        Args:
+            user_id: 用户id
+            module_code: 模块码
+            permission_code: 权限码
+
+        Returns:
+
         """
         # 构造查询语句
         queryset = self.User.filter(id=user_id,
                                     role_assignments__role__permission_assignments__permission__module__code=module_code,
                                     role_assignments__role__permission_assignments__permission__code=permission_code)
         return await queryset.exists()
+
     # 登录
     async def login(self, username: str, password: str) -> CurrentUserDM:
         """
         用户登录
-        :param username: 用户名
-        :param password: 密码
-        :return: token和last_login_at上一次登录的时间
-        :raise UserNotFoundError: 用户不存在
-        :raise UserPasswordIncorrectError: 用户密码错误
-        :raise UserInactiveError: 用户被锁定，禁止登录
+        Args:
+            username: 用户名
+            password: 密码
+
+        Returns:
+            current_user当前用户
+
+        Raises:
+            UserNotFoundError: 用户不存在
+            UserPasswordIncorrectError: 用户密码错误
+            UserInactiveError: 用户被锁定，禁止登录
+
         """
         user = await self.User.get_or_none(username=username)
         if user:
@@ -121,7 +132,8 @@ class UserService:
                         permissions=permissions_dms,
                         modules=modules_dms)
                     # 记录到redis
-                    await self.redis_conn.set(current_user.token,current_user.model_dump_json(),ex=GLOBAL_SETTINGS.redis_key_token_ex)
+                    await self.redis_conn.set(current_user.token, current_user.model_dump_json(),
+                                              ex=GLOBAL_SETTINGS.redis_key_token_ex)
                     return current_user
                 else:
                     logger.info(f'id: {user.id} 用户名: {user.username} 登录失败 密码错误')
@@ -138,6 +150,51 @@ class UserService:
     async def logout(self, current_user: CurrentUserDM):
         # 路由层会通过依赖检查token是否有效，不会出现token已失效却仍可以进行注销的操作
         await self.redis_conn.delete(current_user.token)
+
+    # 创建用户
+    async def create_user(self, data: CreateUserInSchema, current_user: CurrentUserDM) -> int:
+        """
+        创建用户
+        Args:
+            data: 用户数据
+            current_user: 当前用户
+
+        Returns:
+            创建成功的用户id
+        Raises:
+            UsernameExistedError: 用户名已存在
+        """
+        # 昵称默认=username
+        if not data.nickname:
+            data.nickname = data.username
+        # 判断username是否存在
+        if await self.User.exists(username=data.username):
+            raise UsernameExistedError
+        user = await self.User.create(**data.model_dump(exclude={'role_ids'}), created_by_id=current_user.id)
+        logger.info(
+            f'用户【id:{current_user.id} username:{current_user.username}】创建用户【id:{user.id} username:{user.username}】')
+        # 连接角色
+        if data.role_ids:
+            for role_id in data.role_ids:
+                await self.User_Role.create(user=user, role_id=role_id)
+            logger.info(
+                f'用户【id:{current_user.id} username:{current_user.username}】分配用户【id:{user.id} username:{user.username}】角色【ids:{data.role_ids}】')
+        return user.id
+
+    # 删除多个用户
+    async def delete_users(self, user_ids: list[int], current_user: CurrentUserDM) -> None:
+        """
+        删除多个用户
+        Args:
+            user_ids: 需要删除的用户们的id
+            current_user: 当前用户
+
+        Returns:
+        """
+        # 非系统角色删除
+        res = await self.User.filter(id__in=user_ids, is_system=False).delete()
+        logger.info(
+            f'用户【id:{current_user.id} username:{current_user.username}】尝试删除用户【ids:{user_ids}】，成功删除{res}个用户。')
 
 
 user_service = UserService()

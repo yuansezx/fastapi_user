@@ -5,7 +5,12 @@ from pydantic import BaseModel
 
 
 """服务层schemas"""
-
+class CreateUserInSchema(BaseModel):
+    username: str
+    nickname: str | None = None
+    password: str
+    is_active: bool = False
+    role_ids: list[int] | None = None
 
 
 
@@ -18,3 +23,9 @@ class UserLoginResSchema(BaseModel):
     last_login_at: datetime | None
     roles: list
     permissions: list
+
+class CreateUserReqSchema(CreateUserInSchema):
+    pass
+
+class CreateUserResSchema(BaseModel):
+    user_id: int

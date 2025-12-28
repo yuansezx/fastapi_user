@@ -10,8 +10,8 @@ class User(Model):
     created_at = fields.DatetimeField(auto_now_add=True)
     # 更改last_login_at字段不更改updated_at
     updated_at = fields.DatetimeField(null=True)
-    # 是否运行登录
-    is_active = fields.BooleanField(default=True)
+    # 是否允许登录
+    is_active = fields.BooleanField(default=False)
     # 是否为系统保留用户
     is_system = fields.BooleanField(default=False)
     last_login_at = fields.DatetimeField(null=True)

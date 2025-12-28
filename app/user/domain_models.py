@@ -14,7 +14,7 @@ class CurrentUserDM(BaseModel):
     token: str
     id: int
     username: str
-    last_login_at: datetime
+    last_login_at: datetime | None
     is_system: bool
     roles: list[RoleDM]
     permissions: list[PermissionDM]
