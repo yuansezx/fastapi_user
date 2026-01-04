@@ -1,20 +1,38 @@
 from datetime import datetime
 
-from pydantic import BaseModel
-
-
+from pydantic import BaseModel, Field
 
 """服务层schemas"""
 class CreateUserInSchema(BaseModel):
-    username: str
-    nickname: str | None = None
+    username: str = Field(max_length=20)
+    nickname: str | None = Field(None,max_length=20)
     password: str
     is_active: bool = False
     role_ids: list[int] | None = None
 
+class UserDataOutSchema(BaseModel):
+    id: int
+    username: str
+    nickname: str
+    created_at: datetime
+    updated_at: datetime | None
+    is_active: bool
+    is_system: bool
+    last_login_at: datetime | None
+    created_by_id: int
+    updated_by_id: int | None
 
+class GetUsersOutSchema(BaseModel):
+    total: int
+    total_pages: int
+    page: int
+    page_size: int
+    order_by: list[str]
+    data: list[UserDataOutSchema]
 
-
+class CreateRoleInSchema(BaseModel):
+    name: str = Field(max_length=20)
+    description: str = Field(max_length=100)
 
 """路由层schemas"""
 
@@ -31,3 +49,9 @@ class CreateUserReqSchema(CreateUserInSchema):
 
 class CreateUserResSchema(BaseModel):
     user_id: int
+
+class GetUsersResSchema(GetUsersOutSchema):
+    pass
+
+class CreateRoleReqSchema(CreateRoleInSchema):
+    pass

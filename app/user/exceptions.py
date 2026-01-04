@@ -12,3 +12,6 @@ class UserInactiveError(Exception):
 
 class UsernameExistedError(Exception):
     pass
+
+class RoleNameExistedError(Exception):
+    pass

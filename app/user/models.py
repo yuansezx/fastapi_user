@@ -19,6 +19,19 @@ class User(Model):
     created_by = fields.ForeignKeyField('models.User', on_delete=fields.RESTRICT, related_name='created_users')
     updated_by = fields.ForeignKeyField('models.User', null=True, on_delete=fields.RESTRICT,
                                         related_name='updated_users')
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'nickname': self.nickname,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
+            'is_active': self.is_active,
+            'is_system': self.is_system,
+            'last_login_at': self.last_login_at,
+            'created_by_id': self.created_by_id,
+            'updated_by_id': self.updated_by_id
+        }
 
 
 class Role(Model):

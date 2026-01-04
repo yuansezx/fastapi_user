@@ -5,7 +5,8 @@ from app.core.schemas import FailResSchema
 from app.user.service import user_service
 from app.user.dependencies import get_current_user
 from app.user.exceptions import UserInactiveError, UserPasswordIncorrectError, UserNotFoundError, UsernameExistedError
-from app.user.schemas import UserLoginResSchema, CreateUserReqSchema, CreateUserResSchema
+from app.user.schemas import UserLoginResSchema, CreateUserReqSchema, CreateUserResSchema, GetUsersResSchema, \
+    CreateRoleReqSchema
 
 user_router = APIRouter()
 
@@ -35,7 +36,7 @@ async def logout(response: Response, current_user=Depends(get_current_user({'use
 
 
 # 创建用户
-@user_router.post('', summary='创建用户', status_code=status.HTTP_201_CREATED,
+@user_router.post('/users', summary='创建用户', status_code=status.HTTP_201_CREATED,
                   responses={201: {'model': CreateUserResSchema},
                              400: {'model': FailResSchema, 'description': "detail:'用户名已存在。'"}})
 async def create_user(data: CreateUserReqSchema, current_user=Depends(get_current_user({'user':'create'}))):
@@ -45,25 +46,32 @@ async def create_user(data: CreateUserReqSchema, current_user=Depends(get_curren
         raise HTTPException(status.HTTP_400_BAD_REQUEST, '用户名已存在。')
     return CreateUserResSchema(user_id=user_id)
 
-# # 查看所有用户(分页)
-# @user_router.get('',summary='查看所有用户（分页）')
-# async def get_users(page:int = Query(1, gt=0,description='请求第几页的数据'),
-#                     page_size:int=Query(20,gt=0,le=100,description='每页显示多少条数据'),
-#                     order_by:list[str]=Query('id'),description='排序方式',
-#                     current_user=Depends(get_current_user({'user':'get'}))):
+# 查看所有用户(分页)
+@user_router.get('/users',summary='查看所有用户（分页）', response_model=GetUsersResSchema)
+async def get_users(page:int = Query(1, gt=0,description='请求第几页的数据'),
+                    page_size:int=Query(20,gt=0,le=100,description='每页显示多少条数据'),
+                    order_by:list[str]=Query(['id'],description='排序方式'),
+                    current_user=Depends(get_current_user({'user':'read'}))):
+    users=await user_service.get_users(page, page_size, order_by)
+    return users
+
 
 
 # 删除用户
-@user_router.delete('/{user_id}', summary='删除单个用户', status_code=status.HTTP_204_NO_CONTENT)
+@user_router.delete('/users/{user_id}', summary='删除单个用户', status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(user_id: int, current_user=Depends(get_current_user({'user':'delete'}))):
     await user_service.delete_users([user_id], current_user)
 
 
 # 删除多个用户
-@user_router.delete('', summary='删除多个用户', status_code=status.HTTP_204_NO_CONTENT)
+@user_router.delete('/users', summary='删除多个用户', status_code=status.HTTP_204_NO_CONTENT)
 async def delete_users(user_ids: set[int] = Body(), current_user=Depends(get_current_user({'user':'delete'}))):
     await user_service.delete_users(user_ids, current_user)
 
+# 创建角色
+@user_router.post('/roles')
+async def create_role(data:CreateRoleReqSchema,current_user=Depends(get_current_user({'user':'create'}))):
+    await user_service.create_role(data)
 
 
 @user_router.post('/test', summary='测试')

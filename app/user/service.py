@@ -1,4 +1,5 @@
 from datetime import datetime
+from http.cookiejar import offset_from_tz_string
 
 from loguru import logger
 from pytz import timezone
@@ -8,9 +9,10 @@ from app.core.redis_manager import redis_manager
 from app.core.settings import GLOBAL_SETTINGS
 from app.core.service import module_service
 from app.user.domain_models import RoleDM, CurrentUserDM
-from app.user.exceptions import UserNotFoundError, UserPasswordIncorrectError, UserInactiveError, UsernameExistedError
+from app.user.exceptions import UserNotFoundError, UserPasswordIncorrectError, UserInactiveError, UsernameExistedError, \
+    RoleNameExistedError
 from app.user.models import User, Role, User_Role, Role_Permission
-from app.user.schemas import CreateUserInSchema
+from app.user.schemas import CreateUserInSchema, UserDataOutSchema, GetUsersOutSchema, CreateRoleInSchema
 from app.user.utils import password_hash
 from app.user.utils.jwt_wrapper import jwt_wrapper
 
@@ -200,17 +202,49 @@ class UserService:
         logger.info(
             f'用户【id:{current_user.id} username:{current_user.username}】尝试删除用户【ids:{user_ids}】，成功删除{res}个用户。')
 
-    # # 查看用户（分页）
-    # async def get_users(self, page:int,page_size:int,order_by:str):
+    # 查看用户（分页）
+    async def get_users(self, page:int,page_size:int,order_by:list[str])->GetUsersOutSchema:
+        """
+        查看用户（分页）
+        Args:
+            page: 第几页
+            page_size: 每页显示的数据量
+            order_by: 排序方式
+
+        Returns:
+
+        """
+        total=await self.User.all().count()
+        total_pages = (total+page_size-1)//page_size
+        offset=(page-1)*page_size
+        users=await self.User.all().offset(offset).limit(page_size).order_by(*order_by)
+
+        result=[]
+        for user in users:
+            result.append(UserDataOutSchema(**user.to_dict()))
+
+        return GetUsersOutSchema(total=total,total_pages=total_pages,page=page,page_size=page_size,order_by=order_by,
+                                 data=result)
+
+    # # 创建角色
+    # async def create_role(self,data: CreateRoleInSchema, current_user: CurrentUserDM) -> int:
     #     """
-    #     查看用户（分页）
+    #     创建角色
     #     Args:
-    #         page: 第几页
-    #         page_size: 每页显示的数据量
-    #         order_by: 排序方式
+    #         data: 角色数据
+    #         current_user: 当前用户
     #
     #     Returns:
+    #         角色id
+    #
+    #     Raises:
+    #         RoleNameExistedError 角色名已存在
     #
     #     """
+    #     if await self.Role.exists(name=data.name):
+    #         raise RoleNameExistedError
+    #     role=await self.Role.create(**data.model_dump(), created_by_id=current_user.id)
+    #     logger.info(f'用户【id:{current_user.id} username:{current_user.username}】 创建角色【id:{role.id} name:{role.name}】')
+    #     return role.id
 
 user_service = UserService()
