@@ -132,8 +132,10 @@ class UserService:
                         permissions=permissions_dms,
                         modules=modules_dms)
                     # 记录到redis
-                    await self.redis_conn.set(current_user.token, current_user.model_dump_json(),
-                                              ex=GLOBAL_SETTINGS.redis_key_token_ex)
+                    await self.redis_conn.hset(f'app:user:current_user:{current_user.id}',current_user.token,current_user.model_dump_json())
+                    await self.redis_conn.expire(f'app:user:current_user:{current_user.id}',GLOBAL_SETTINGS.redis_key_token_ex)
+                    # await self.redis_conn.set(current_user.token, current_user.model_dump_json(),
+                    #                           ex=GLOBAL_SETTINGS.redis_key_token_ex)
                     return current_user
                 else:
                     logger.info(f'id: {user.id} 用户名: {user.username} 登录失败 密码错误')
@@ -149,7 +151,7 @@ class UserService:
     # 登出
     async def logout(self, current_user: CurrentUserDM):
         # 路由层会通过依赖检查token是否有效，不会出现token已失效却仍可以进行注销的操作
-        await self.redis_conn.delete(current_user.token)
+        await self.redis_conn.hdel(f'app:user:current_user:{current_user.id}',current_user.token)
 
     # 创建用户
     async def create_user(self, data: CreateUserInSchema, current_user: CurrentUserDM) -> int:
@@ -182,19 +184,33 @@ class UserService:
         return user.id
 
     # 删除多个用户
-    async def delete_users(self, user_ids: list[int], current_user: CurrentUserDM) -> None:
+    async def delete_users(self, user_ids: set[int], current_user: CurrentUserDM) -> None:
         """
         删除多个用户
         Args:
-            user_ids: 需要删除的用户们的id
+            user_ids: 需要删除的用户们的id集合
             current_user: 当前用户
 
         Returns:
         """
-        # 非系统角色删除
-        res = await self.User.filter(id__in=user_ids, is_system=False).delete()
+        # 去掉删除自己的情况
+        user_ids_new = user_ids - {current_user.id}
+        # 删除非系统角色
+        res = await self.User.filter(id__in=user_ids_new, is_system=False).delete()
         logger.info(
             f'用户【id:{current_user.id} username:{current_user.username}】尝试删除用户【ids:{user_ids}】，成功删除{res}个用户。')
 
+    # # 查看用户（分页）
+    # async def get_users(self, page:int,page_size:int,order_by:str):
+    #     """
+    #     查看用户（分页）
+    #     Args:
+    #         page: 第几页
+    #         page_size: 每页显示的数据量
+    #         order_by: 排序方式
+    #
+    #     Returns:
+    #
+    #     """
 
 user_service = UserService()

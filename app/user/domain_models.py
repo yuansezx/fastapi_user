@@ -20,10 +20,11 @@ class CurrentUserDM(BaseModel):
     permissions: list[PermissionDM]
     modules: list[ModuleDM]
 
-    def has_permission(self, module_code:str,permission_code:str) -> bool:
-        if module_code and permission_code:
-            for permission in self.permissions:
-                if permission.module_code == module_code and permission.code == permission_code:
-                    return True
-        else:
-            return True
+    def has_permission(self, permission_dict:dict[str,str]) -> bool:
+        for module_code,permission_code in permission_dict.items():
+            if module_code and permission_code:
+                for permission in self.permissions:
+                    if permission.module_code == module_code and permission.code == permission_code:
+                        return True
+            else:
+                return True
