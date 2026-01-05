@@ -14,7 +14,7 @@ def get_current_user(permission_dict:dict[str,str]):
     """
     依赖注入，获取当前用户
     Args:
-        permission_dict: 权限字典，如{'user':'create'}
+        permission_dict: 权限字典，如{'users':'create'}
 
     Returns:
 

@@ -1,17 +1,28 @@
-from app.core.schemas import RegisterModuleIn_PermissionsSchema, RegisterModuleInSchema
-from app.core.service import module_service
+"""
+用户模块初始化，注册资源
+"""
+from app.core.schemas import RegisterResourceIn_PermissionsSchema, RegisterResourceInSchema
+from app.core.service import resource_service
 
 
+# 注册资源
+async def register_resources():
+    # users
+    permissions = [RegisterResourceIn_PermissionsSchema(code='read', name='查看用户'),
+                   RegisterResourceIn_PermissionsSchema(code='create', name='创建用户'),
+                   RegisterResourceIn_PermissionsSchema(code='update', name='更改用户信息'),
+                   RegisterResourceIn_PermissionsSchema(code='delete', name='删除用户')]
+    data = RegisterResourceInSchema(code='users', name='用户数据', description='', permissions=permissions)
+    await resource_service.register_resource(data)
 
-# 注册模块
-async def register_module():
-    permissions = [RegisterModuleIn_PermissionsSchema(code='read', name='查看用户'),
-                   RegisterModuleIn_PermissionsSchema(code='create', name='创建用户'),
-                   RegisterModuleIn_PermissionsSchema(code='update', name='更改用户信息'),
-                   RegisterModuleIn_PermissionsSchema(code='delete', name='删除用户')]
-    data=RegisterModuleInSchema(code='user',name='用户模块',description='用户管理、角色及权限管理',permissions=permissions)
+    # roles
+    permissions = [RegisterResourceIn_PermissionsSchema(code='read', name='查看角色'),
+                   RegisterResourceIn_PermissionsSchema(code='create', name='创建角色'),
+                   RegisterResourceIn_PermissionsSchema(code='update', name='更改角色信息'),
+                   RegisterResourceIn_PermissionsSchema(code='delete', name='删除角色')]
+    data = RegisterResourceInSchema(code='roles', name='角色数据', description='', permissions=permissions)
+    await resource_service.register_resource(data)
 
-    await module_service.register_module(data)
 
 # 初始化超级管理员
 async def init_superadmin():

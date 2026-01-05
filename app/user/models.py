@@ -16,9 +16,11 @@ class User(Model):
     is_system = fields.BooleanField(default=False)
     last_login_at = fields.DatetimeField(null=True)
     # create_by外键指向自身,on_delete设置为受限模式
-    created_by = fields.ForeignKeyField('models.User', on_delete=fields.RESTRICT, related_name='created_users')
+    created_by = fields.ForeignKeyField('models.User', null=True, on_delete=fields.SET_NULL,
+                                        related_name='created_users', )
     updated_by = fields.ForeignKeyField('models.User', null=True, on_delete=fields.RESTRICT,
                                         related_name='updated_users')
+
     def to_dict(self):
         return {
             'id': self.id,

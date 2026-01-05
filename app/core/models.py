@@ -1,8 +1,8 @@
 from tortoise import Model, fields
 
 
-class Module(Model):
-    """模块表"""
+class Resource(Model):
+    """资源表"""
     id = fields.IntField(pk=True)
     code = fields.CharField(max_length=20, unique=True)
     name = fields.CharField(max_length=20)
@@ -23,10 +23,10 @@ class Permission(Model):
     code = fields.CharField(max_length=20)
     name = fields.CharField(max_length=20)
     description = fields.CharField(max_length=100, null=True)
-    module = fields.ForeignKeyField("models.Module", on_delete=fields.CASCADE, related_name="permissions")
+    resource = fields.ForeignKeyField("models.Resource", on_delete=fields.CASCADE, related_name="permissions")
 
     class Meta:
-        unique_together = ("module", "code")
+        unique_together = ("resource", "code")
 
     def to_dict(self):
         return {
@@ -34,5 +34,5 @@ class Permission(Model):
             "code": self.code,
             "name": self.name,
             "description": self.description,
-            "module_id": self.module_id
+            "resource_id": self.resource_id
         }

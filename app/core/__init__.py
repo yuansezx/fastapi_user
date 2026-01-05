@@ -47,10 +47,10 @@ async def init_db() -> None:
     logger.info('数据库表初始化 完成。')
 
 
-# 初始化模块
-async def register_modules() -> None:
+# 初始化资源
+async def register_resources() -> None:
     from app import user
-    await user.register_module()
+    await user.register_resources()
 
 # 启动
 async def start() -> None:
@@ -67,7 +67,7 @@ async def start() -> None:
     # 初始化redis连接池
     redis_manager.create_pool()
     # 注册模块
-    await register_modules()
+    await register_resources()
     # 初始化超管
     from app import user
     await user.init_superadmin()
