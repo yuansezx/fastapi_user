@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
 
     # 挂载路由
     from app.user.router import user_router
-    app.include_router(user_router, prefix="/api", tags=["user"])
+    app.include_router(user_router, prefix="/api")
 
     yield
 

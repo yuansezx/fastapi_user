@@ -4,6 +4,17 @@ from pydantic import BaseModel, Field
 
 """服务层schemas"""
 
+class RegisterResourceIn_PermissionsSchema(BaseModel):
+    code: str
+    name: str
+    description: str | None = None
+
+
+class RegisterResourceInSchema(BaseModel):
+    code: str
+    name: str
+    description: str | None = None
+    permissions: list[RegisterResourceIn_PermissionsSchema]
 
 class CreateUserInSchema(BaseModel):
     username: str = Field(max_length=20)
@@ -133,4 +144,7 @@ class GetRolePermissionsResSchema(GetRolePermissionsOutSchema):
     pass
 
 class UpdateRoleReqSchema(UpdateRoleInSchema):
+    pass
+
+class GetAllPermissionsResSchema(GetAllPermissionsOutSchema):
     pass

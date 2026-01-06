@@ -10,7 +10,7 @@ from app.user.utils.jwt_wrapper import jwt_wrapper
 
 
 # 权限验证
-def get_current_user(permission_dict:dict[str,str]):
+def get_current_user(*need_permissions:dict[str,str]):
     """
     依赖注入，获取当前用户
     Args:
@@ -31,7 +31,7 @@ def get_current_user(permission_dict:dict[str,str]):
             if data_json:
                 current_user = CurrentUserDM.model_validate_json(data_json)
                 # 检查权限
-                if current_user.has_permission(permission_dict):
+                if current_user.has_permission(*need_permissions):
                     return current_user
                 else:
                     raise HTTPException(403, '权限不足。')

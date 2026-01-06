@@ -1,5 +1,8 @@
 """user模块 exceptions"""
 
+class PermissionNotFoundError(Exception):
+    def __init__(self, msg: str = '权限不存在'):
+        super().__init__(msg)
 
 class UserNotFoundError(Exception):
     def __init__(self, msg: str = '用户不存在'):

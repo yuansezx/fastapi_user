@@ -57,6 +57,8 @@ async def start() -> None:
     """app启动的初始化准备"""
     # 初始化日志
     init_logger()
+    # 初始化redis连接池
+    redis_manager.create_pool()
     # 判断是否需要初始化数据库表
     if GLOBAL_SETTINGS.need_init_db:
         await init_db()
@@ -64,8 +66,6 @@ async def start() -> None:
     else:
         await Tortoise.init(config=GLOBAL_SETTINGS.tortoise_orm_config)
         logger.info('orm初始化 完成。')
-    # 初始化redis连接池
-    redis_manager.create_pool()
     # 注册模块
     await register_resources()
     # 初始化超管

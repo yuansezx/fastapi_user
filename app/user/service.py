@@ -3,18 +3,18 @@ from datetime import datetime
 from loguru import logger
 from pytz import timezone
 
-from app.core.domain_models import PermissionDM, ResourceDM
 from app.core.redis_manager import redis_manager
 from app.core.settings import GLOBAL_SETTINGS
-from app.core.service import resource_service
-from app.user.domain_models import RoleDM, CurrentUserDM
+from app.user.domain_models import RoleDM, CurrentUserDM, ResourceDM, PermissionDM
 from app.user.exceptions import UserNotFoundError, UserPasswordIncorrectError, UserInactiveError, UsernameExistedError, \
-    RoleNameExistedError, SystemUserProtectionError, SystemRoleProtectionError, RoleNotFoundError
-from app.user.models import User, Role, User_Role, Role_Permission
+    RoleNameExistedError, SystemUserProtectionError, SystemRoleProtectionError, RoleNotFoundError, \
+    PermissionNotFoundError
+from app.user.models import User, Role, User_Role, Role_Permission, Resource, Permission
 from app.user.schemas import CreateUserInSchema, UserDataOutSchema, GetUsersOutSchema, CreateRoleInSchema, \
     UpdateUserInSchema, RoleDataOutSchema, GetRolesOutSchema, GetRolePermissionOut_ResourceSchema, \
     GetRolePermissionOut_Resource_PermissionSchema, GetRolePermissionsOutSchema, UpdateRoleInSchema, \
-    GetAllPermissionsOutSchema, GetAllPermissionsOut_ResourceSchema, GetAllPermissionsOut_Resource_PermissionSchema
+    GetAllPermissionsOutSchema, GetAllPermissionsOut_ResourceSchema, GetAllPermissionsOut_Resource_PermissionSchema, \
+    RegisterResourceInSchema
 from app.user.utils import password_hash
 from app.user.utils.jwt_wrapper import jwt_wrapper
 
@@ -23,10 +23,23 @@ class UserService:
     def __init__(self):
         self.User = User
         self.Role = Role
+        self.Resource = Resource
+        self.Permission = Permission
         self.User_Role = User_Role
         self.Role_Permission = Role_Permission
-        self.resource_service = resource_service
         self.redis_conn = redis_manager.redis_pool
+
+    async def register_resource(self, data: RegisterResourceInSchema) -> None:
+        # 最好改为删除并重写,因为如果模块code/权限code修改，会直接新建条目，废弃的条目不会被删除
+
+        # 往数据库写入资源数据
+        resource, _ = await self.Resource.update_or_create(data.model_dump(exclude={'permissions', 'code'}),
+                                                           code=data.code)
+        # 往数据库写入权限数据
+        for permission in data.permissions:
+            await self.Permission.update_or_create(permission.model_dump(exclude={'code'}), resource=resource,
+                                                   code=permission.code)
+        logger.info(f'注册资源【{resource.name}】 完成。')
 
     # 初始化超级管理员
     async def init_superadmin(self):
@@ -47,7 +60,7 @@ class UserService:
         # 获取超管角色id
         role_id = await self.Role.get(name='superadmin').values_list('id', flat=True)
         # 获取所有权限id
-        permission_ids = await resource_service.get_all_permission_ids()
+        permission_ids = await self.Permission.all().values_list('id', flat=True)
         await self.update_role_permissions_by_ids(role_id, permission_ids)
         logger.info('初始化超级管理员 完成。')
 
@@ -76,11 +89,6 @@ class UserService:
             new_assignments = [self.Role_Permission(role_id=role_id, permission_id=permission_id) for permission_id in
                                to_add_ids]
             await self.Role_Permission.bulk_create(new_assignments)
-
-    # 读取user拥有的所有角色
-    async def get_roles_by_user(self, user: User):
-        roles = await self.Role.filter(user_assignments__user=user).all()
-        return roles
 
     # 通过id更新用户拥有的角色
     async def update_user_roles_by_ids(self, user_id: int, role_ids: list[int]) -> None:
@@ -144,9 +152,10 @@ class UserService:
             if user.is_active:
                 # 验证密码
                 if password_hash.verify_password(password, user.password):
-                    roles = await self.get_roles_by_user(user)
-                    permissions = await self.resource_service.get_permissions_with_resources_by_role_ids(
-                        [role.id for role in roles])
+                    roles = await self.Role.filter(user_assignments__user=user).all()
+                    permissions = await self.Permission.filter(
+                        role_assignments__role_id__in=[role.id for role in roles]).select_related(
+                        'resource').distinct().all()
                     # resource去重
                     resource_dict = {permission.resource.id: permission.resource for permission in permissions}
                     resources = list(resource_dict.values())
@@ -381,7 +390,7 @@ class UserService:
         Returns:
 
         """
-        permissions = await self.resource_service.get_permissions_with_resources_by_role_ids([role_id])
+        permissions = await self.Permission.filter(role_assignments__role_id=role_id).select_related('resource').all()
         # 格式化输出
         resources_dict: dict[int, GetRolePermissionOut_ResourceSchema] = {}
         for permission in permissions:
@@ -431,21 +440,24 @@ class UserService:
         Returns:
         Raises:
             RoleNotFoundError('角色不存在或角色为系统保留角色。')
+            PermissionNotFoundError 权限不存在
         """
         # 判断是否为有效角色
         if await self.Role.filter(id=role_id, is_system=False).exists():
             # 筛选有效的permission_ids
-            if valid_permission_ids := await self.resource_service.filter_valid_permission_ids(permission_ids):
+            if valid_permission_ids := await self.Permission.filter(id__in=permission_ids).values_list(
+                    'id', flat=True):
                 await self.update_role_permissions_by_ids(role_id, valid_permission_ids)
-                logger.info(f'用户【id:{current_user.id} username:{current_user.username}】 更改角色【id:{role_id} 权限】')
-            # else:
-            #     raise
+                logger.info(
+                    f'用户【id:{current_user.id} username:{current_user.username}】 更改角色【id:{role_id}】 权限【ids:{valid_permission_ids}】')
+            else:
+                raise PermissionNotFoundError
         else:
             raise RoleNotFoundError('角色不存在或角色为系统保留角色。')
 
     # 查看所有权限
     async def get_all_permissions(self) -> GetAllPermissionsOutSchema:
-        resources = await self.resource_service.get_all_resources_with_permissions()
+        resources = await self.Resource.all().prefetch_related('permissions')
 
         result = []
         # 格式化输出
