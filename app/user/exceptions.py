@@ -35,3 +35,4 @@ class SystemRoleProtectionError(Exception):
 class RoleNotFoundError(Exception):
     def __init__(self, msg='角色不存在'):
         super().__init__(msg)
+

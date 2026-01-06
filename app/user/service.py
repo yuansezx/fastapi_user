@@ -13,7 +13,8 @@ from app.user.exceptions import UserNotFoundError, UserPasswordIncorrectError, U
 from app.user.models import User, Role, User_Role, Role_Permission
 from app.user.schemas import CreateUserInSchema, UserDataOutSchema, GetUsersOutSchema, CreateRoleInSchema, \
     UpdateUserInSchema, RoleDataOutSchema, GetRolesOutSchema, GetRolePermissionOut_ResourceSchema, \
-    GetRolePermissionOut_Resource_PermissionSchema, GetRolePermissionsOutSchema
+    GetRolePermissionOut_Resource_PermissionSchema, GetRolePermissionsOutSchema, UpdateRoleInSchema, \
+    GetAllPermissionsOutSchema, GetAllPermissionsOut_ResourceSchema, GetAllPermissionsOut_Resource_PermissionSchema
 from app.user.utils import password_hash
 from app.user.utils.jwt_wrapper import jwt_wrapper
 
@@ -66,7 +67,7 @@ class UserService:
             await self.Role_Permission.filter(role_id=role_id).values_list('permission_id', flat=True))
         # 角色目标权限id列表
         target_permission_ids = set(permission_ids)
-        # 计算需呀增加和移除的权限
+        # 计算需要增加和移除的权限
         to_add_ids = target_permission_ids - old_permission_ids
         to_remove_ids = old_permission_ids - target_permission_ids
         if to_remove_ids:
@@ -371,7 +372,7 @@ class UserService:
                                  data=result)
 
     # 查看角色所有权限
-    async def get_role_permissions(self, role_id: int)-> GetRolePermissionsOutSchema:
+    async def get_role_permissions(self, role_id: int) -> GetRolePermissionsOutSchema:
         """
         查看角色的所有权限，输出按照resource归类，并且permission按照id排序
         Args:
@@ -394,11 +395,73 @@ class UserService:
                                                                code=permission.code,
                                                                name=permission.name,
                                                                description=permission.description))
-        resources=list(resources_dict.values())
+        resources = list(resources_dict.values())
         # permissions排一下序
         for resource in resources:
             resource.permissions.sort(key=lambda p: p.id)
         return GetRolePermissionsOutSchema(resources=resources)
+
+    # 更改角色信息
+    async def update_role(self, role_id: int, data: UpdateRoleInSchema, current_user: CurrentUserDM):
+        """
+        更改角色信息
+        Args:
+            role_id:
+            data:
+
+        Returns:
+        Raises:
+            RoleNotFoundError('角色不存在或角色为系统保留角色。')
+        """
+        # 判断是否为有效角色
+        if await self.Role.filter(id=role_id, is_system=False).exists():
+            await self.Role.filter(id=role_id).update(**data.model_dump(exclude_unset=True))
+            logger.info(f'用户【id:{current_user.id} username:{current_user.username}】 更改角色【id:{role_id}】 信息。')
+        else:
+            raise RoleNotFoundError('角色不存在或角色为系统保留角色。')
+
+    # 更改角色拥有的权限
+    async def update_role_permissions(self, role_id: int, permission_ids: list[int], current_user: CurrentUserDM):
+        """
+        更改角色拥有的权限
+        Args:
+            role_id:
+            permission_ids:
+
+        Returns:
+        Raises:
+            RoleNotFoundError('角色不存在或角色为系统保留角色。')
+        """
+        # 判断是否为有效角色
+        if await self.Role.filter(id=role_id, is_system=False).exists():
+            # 筛选有效的permission_ids
+            if valid_permission_ids := await self.resource_service.filter_valid_permission_ids(permission_ids):
+                await self.update_role_permissions_by_ids(role_id, valid_permission_ids)
+                logger.info(f'用户【id:{current_user.id} username:{current_user.username}】 更改角色【id:{role_id} 权限】')
+            # else:
+            #     raise
+        else:
+            raise RoleNotFoundError('角色不存在或角色为系统保留角色。')
+
+    # 查看所有权限
+    async def get_all_permissions(self) -> GetAllPermissionsOutSchema:
+        resources = await self.resource_service.get_all_resources_with_permissions()
+
+        result = []
+        # 格式化输出
+        for resource in resources:
+            resource_out = GetAllPermissionsOut_ResourceSchema(id=resource.id,
+                                                               code=resource.code,
+                                                               name=resource.name,
+                                                               description=resource.description,
+                                                               permissions=[])
+            for permission in resource.permissions:
+                resource_out.permissions.append(GetAllPermissionsOut_Resource_PermissionSchema(id=permission.id,
+                                                                                               code=permission.code,
+                                                                                               name=permission.name,
+                                                                                               description=permission.description))
+            result.append(resource_out)
+        return GetAllPermissionsOutSchema(resources=result)
 
 
 user_service = UserService()

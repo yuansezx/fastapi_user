@@ -7,7 +7,8 @@ from app.user.dependencies import get_current_user
 from app.user.exceptions import UserInactiveError, UserPasswordIncorrectError, UserNotFoundError, UsernameExistedError, \
     RoleNotFoundError
 from app.user.schemas import UserLoginResSchema, CreateUserReqSchema, CreateUserResSchema, GetUsersResSchema, \
-    CreateRoleReqSchema, UpdateUserReqSchema, UpdateUserInSchema, GetRolesResSchema, GetRolePermissionsResSchema
+    CreateRoleReqSchema, UpdateUserReqSchema, UpdateUserInSchema, GetRolesResSchema, GetRolePermissionsResSchema, \
+    UpdateRoleReqSchema
 
 user_router = APIRouter()
 
@@ -115,6 +116,28 @@ async def get_roles(page: int = Query(1, gt=0, description='请求第几页的�
 async def get_role_permissions(role_id: int, current_user=Depends(get_current_user({'roles': 'read'}))):
     result = await user_service.get_role_permissions(role_id)
     return result
+
+
+# 更改角色信息
+@user_router.patch('/roles/{role_id}', summary='更改角色信息', status_code=status.HTTP_204_NO_CONTENT)
+async def update_role(role_id: int, data: UpdateRoleReqSchema,
+                      current_user=Depends(get_current_user({'roles': 'update'}))):
+    try:
+        await user_service.update_role(role_id, data, current_user)
+    except RoleNotFoundError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+# 更改角色拥有的权限
+@user_router.put('/roles/{role_id}/permissions', summary='更改角色拥有的权限', status_code=status.HTTP_204_NO_CONTENT)
+async def update_role_permissions(role_id: int, data: list[int] = Body(),current_user=Depends(get_current_user({'roles': 'update'}))):
+    try:
+        await user_service.update_role_permissions(role_id, data, current_user)
+    except RoleNotFoundError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+# 查看所有权限
+
 
 
 @user_router.post('/test', summary='测试')

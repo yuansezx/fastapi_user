@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-
 from app.core.exceptions import global_exception_handler
 from app.core.settings import GLOBAL_SETTINGS
 from app import core
@@ -25,7 +24,8 @@ async def lifespan(app: FastAPI):
 
 
 def create_app():
-    app = FastAPI(title='基于角色的权限管理', lifespan=lifespan)
+    app = FastAPI(title='基于角色的权限管理', lifespan=lifespan, docs_url=GLOBAL_SETTINGS.docs_url,
+                  redoc_url=GLOBAL_SETTINGS.redoc_url)
     # 注册全局异常处理函数
     app.add_exception_handler(Exception, global_exception_handler)
 

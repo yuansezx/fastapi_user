@@ -22,7 +22,7 @@ class ResourceService:
         logger.info(f'注册资源【{resource.name}】 完成。')
 
     async def get_all_permission_ids(self) -> list[int]:
-        """获取所有权限数据"""
+        """获取所有权限id"""
         return await self.Permission.all().values_list('id', flat=True)
 
     async def get_all_resources_with_permissions(self) -> list[Resource]:
@@ -40,5 +40,16 @@ class ResourceService:
         """
         return await self.Permission.filter(role_assignments__role_id__in=role_ids).select_related(
             'resource').distinct().all()
+
+    async def filter_valid_permission_ids(self, permission_ids: list[int]) -> list[int]:
+        """
+        筛选出合法的权限id
+        Args:
+            permission_ids:
+
+        Returns:
+
+        """
+        return await self.Permission.filter(permission_id__in=permission_ids).values_list('id', flat=True)
 
 resource_service = ResourceService()

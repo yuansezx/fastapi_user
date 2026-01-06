@@ -26,6 +26,9 @@ class GlobalSettings(BaseSettings):
         yaml_settings = YamlConfigSettingsSource(settings_cls)
         return yaml_settings, init_settings, env_settings, dotenv_settings, file_secret_settings
 
+    # docs url
+    docs_url : str = None
+    redoc_url : str = None
     # cors
     cors_allowed_origins : list[str] | None = None
     # orm配置

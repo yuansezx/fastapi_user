@@ -76,6 +76,26 @@ class GetRolePermissionOut_ResourceSchema(BaseModel):
 class GetRolePermissionsOutSchema(BaseModel):
     resources: list[GetRolePermissionOut_ResourceSchema]
 
+class UpdateRoleInSchema(BaseModel):
+    name: str | None = None
+    description: str | None = None
+
+class GetAllPermissionsOut_Resource_PermissionSchema(BaseModel):
+    id: int
+    code: str
+    name: str
+    description: str | None = None
+
+class GetAllPermissionsOut_ResourceSchema(BaseModel):
+    id: int
+    code: str
+    name: str
+    description: str | None = None
+    permissions: list[GetAllPermissionsOut_Resource_PermissionSchema]
+
+class GetAllPermissionsOutSchema(BaseModel):
+    resources: list[GetAllPermissionsOut_ResourceSchema]
+
 """路由层schemas"""
 
 
@@ -110,4 +130,7 @@ class GetRolesResSchema(GetUsersOutSchema):
     pass
 
 class GetRolePermissionsResSchema(GetRolePermissionsOutSchema):
+    pass
+
+class UpdateRoleReqSchema(UpdateRoleInSchema):
     pass
