@@ -1,3 +1,7 @@
+# api docs
+docs_url: /docs
+redoc_url: /redoc
+
 cors_allowed_origins: []
 
 # jwt设置

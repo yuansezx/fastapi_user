@@ -72,6 +72,19 @@ class User(Model):
             'updated_by_id': self.updated_by_id
         }
 
+    async def to_dict_with_roles(self):
+        """
+        带有角色
+        需要先使用预加载用于减少数据库查询 prefetch_related('role_assignments__role')
+        Returns:
+
+        """
+        await self.fetch_related('role_assignments__role')
+        role_dicts = [assignment.role.to_dict() for assignment in self.role_assignments]
+        data_dict = self.to_dict()
+        data_dict['roles'] = role_dicts
+        return data_dict
+
 
 class Role(Model):
     """角色表"""

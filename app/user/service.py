@@ -10,7 +10,7 @@ from app.user.exceptions import UserNotFoundError, UserPasswordIncorrectError, U
     RoleNameExistedError, SystemUserProtectionError, SystemRoleProtectionError, RoleNotFoundError, \
     PermissionNotFoundError
 from app.user.models import User, Role, User_Role, Role_Permission, Resource, Permission
-from app.user.schemas import CreateUserInSchema, UserDataOutSchema, GetUsersOutSchema, CreateRoleInSchema, \
+from app.user.schemas import CreateUserInSchema, GetUsersOut_DataSchema, GetUsersOutSchema, CreateRoleInSchema, \
     UpdateUserInSchema, RoleDataOutSchema, GetRolesOutSchema, GetRolePermissionOut_ResourceSchema, \
     GetRolePermissionOut_Resource_PermissionSchema, GetRolePermissionsOutSchema, UpdateRoleInSchema, \
     GetAllPermissionsOutSchema, GetAllPermissionsOut_ResourceSchema, GetAllPermissionsOut_Resource_PermissionSchema, \
@@ -65,7 +65,7 @@ class UserService:
         logger.info('初始化超级管理员 完成。')
 
     # 通过id更新角色权限
-    async def update_role_permissions_by_ids(self, role_id, permission_ids: list[int]) -> None:
+    async def update_role_permissions_by_ids(self, role_id, permission_ids: list[int]) -> tuple[int, int]:
         """
         通过id赋予角色权限
         Args:
@@ -73,6 +73,7 @@ class UserService:
             permission_ids: 权限id列表
 
         Returns:
+            assignments_created_count 创建条目个数, assignments_deleted_count 删除条目个数
 
         """
         # 角色旧权限id列表
@@ -83,15 +84,23 @@ class UserService:
         # 计算需要增加和移除的权限
         to_add_ids = target_permission_ids - old_permission_ids
         to_remove_ids = old_permission_ids - target_permission_ids
-        if to_remove_ids:
-            await self.Role_Permission.filter(role_id=role_id, permission_id__in=to_remove_ids).delete()
+
+        assignments_deleted_count, assignments_created_count = 0, 0
         if to_add_ids:
             new_assignments = [self.Role_Permission(role_id=role_id, permission_id=permission_id) for permission_id in
                                to_add_ids]
+            # 建议使用事务包裹，Postgres下是一条insert语句，所以只会全部成功或全部失败
+            # 但其他数据库可能会拆成多个insert执行，导致出现部分成功的情况
             await self.Role_Permission.bulk_create(new_assignments)
+            assignments_created_count = len(new_assignments)
+        if to_remove_ids:
+            assignments_deleted_count = await self.Role_Permission.filter(role_id=role_id,
+                                                                          permission_id__in=to_remove_ids).delete()
+
+        return assignments_created_count, assignments_deleted_count
 
     # 通过id更新用户拥有的角色
-    async def update_user_roles_by_ids(self, user_id: int, role_ids: list[int]) -> None:
+    async def update_user_roles_by_ids(self, user_id: int, role_ids: list[int]) -> tuple[int, int]:
         """
         通过id更新用户拥有的角色
         Args:
@@ -99,17 +108,22 @@ class UserService:
             role_ids: 目标角色id列表
 
         Returns:
+            assignments_created_count 创建条目个数, assignments_deleted_count 删除条目个数
 
         """
         old_role_ids = set(await self.User_Role.filter(user_id=user_id).values_list('role_id', flat=True))
         target_role_ids = set(role_ids)
         to_add_ids = target_role_ids - old_role_ids
         to_remove_ids = old_role_ids - target_role_ids
-        if to_remove_ids:
-            await self.User_Role.filter(user_id=user_id, role_id__in=to_remove_ids).delete()
+
+        assignments_deleted_count, assignments_created_count = 0, 0
         if to_add_ids:
             new_assignments = [self.User_Role(user_id=user_id, role_id=role_id) for role_id in to_add_ids]
             await self.User_Role.bulk_create(new_assignments)
+            assignments_created_count = len(new_assignments)
+        if to_remove_ids:
+            assignments_deleted_count = await self.User_Role.filter(user_id=user_id, role_id__in=to_remove_ids).delete()
+        return assignments_created_count, assignments_deleted_count
 
     # 通过数据库核查权限
     async def verify_permission_by_db(self, user_id: int, resource_code: str, permission_code: str) -> bool:
@@ -168,7 +182,7 @@ class UserService:
                     last_login_at = user.last_login_at
                     user.last_login_at = datetime.now(timezone('UTC'))
                     await user.save(update_fields=['last_login_at'])
-                    logger.info(f'id: {user.id} 用户名: {user.username} 登录成功')
+                    logger.info(f'用户【id:{user.id}】 登录成功')
                     # 生成DM对象
                     current_user = CurrentUserDM(
                         token=jwt_wrapper.create_token({'user_id': user.id, 'username': user.username}),
@@ -188,14 +202,14 @@ class UserService:
                     #                           ex=GLOBAL_SETTINGS.redis_key_token_ex)
                     return current_user
                 else:
-                    logger.info(f'id: {user.id} 用户名: {user.username} 登录失败 密码错误')
+                    logger.info(f'用户【id:{user.id}】 登录失败 密码错误')
                     raise UserPasswordIncorrectError
             else:
-                logger.info(f'id: {user.id} 用户名: {user.username} 登录失败 用户账号不可用')
+                logger.info(f'用户【id:{user.id}】 登录失败 用户账号不可用')
                 raise UserInactiveError
 
         else:
-            logger.info(f'用户名: {username} 登录失败 用户名不存在')
+            logger.info(f'用户名:{username} 登录失败 用户名不存在')
             raise UserNotFoundError
 
     # 登出
@@ -225,14 +239,8 @@ class UserService:
         # password加密
         data.password = password_hash.hash_password(data.password)
         user = await self.User.create(**data.model_dump(exclude={'role_ids'}), created_by_id=current_user.id)
-        logger.info(
-            f'用户【id:{current_user.id} username:{current_user.username}】创建用户【id:{user.id} username:{user.username}】')
-        # 连接角色
-        if data.role_ids:
-            for role_id in data.role_ids:
-                await self.User_Role.create(user=user, role_id=role_id)
-            logger.info(
-                f'用户【id:{current_user.id} username:{current_user.username}】分配用户【id:{user.id} username:{user.username}】角色【ids:{data.role_ids}】')
+        logger.info(f'用户【id:{current_user.id}】 创建用户【id:{user.id}】')
+
         return user.id
 
     # 删除多个用户
@@ -251,6 +259,9 @@ class UserService:
         res = await self.User.filter(id__in=user_ids_new, is_system=False).delete()
         logger.info(
             f'用户【id:{current_user.id} username:{current_user.username}】尝试删除用户【ids:{user_ids}】，成功删除{res}个用户。')
+        # 如果用户在线，踢下线
+        if res:
+            await self.redis_conn.delete(*[f'app:user:current_user:{user_id}' for user_id in user_ids_new])
 
     # 查看用户（分页）
     async def get_users(self, page: int, page_size: int, order_by: list[str]) -> GetUsersOutSchema:
@@ -267,11 +278,12 @@ class UserService:
         total = await self.User.all().count()
         total_pages = (total + page_size - 1) // page_size
         offset = (page - 1) * page_size
-        users = await self.User.all().offset(offset).limit(page_size).order_by(*order_by)
+        users = await self.User.all().prefetch_related('role_assignments__role').offset(offset).limit(
+            page_size).order_by(*order_by)
 
         result = []
         for user in users:
-            result.append(UserDataOutSchema(**user.to_dict()))
+            result.append(GetUsersOut_DataSchema(**await user.to_dict_with_roles()))
 
         return GetUsersOutSchema(total=total, total_pages=total_pages, page=page, page_size=page_size,
                                  order_by=order_by,
@@ -296,16 +308,19 @@ class UserService:
             if data.password:
                 data.password = password_hash.hash_password(data.password)
             # 更改写入用户表
-            await self.User.filter(id=user_id).update(**data.model_dump(exclude_unset=True),
-                                                      updated_at=datetime.now(timezone('UTC')),
-                                                      updated_by_id=current_user.id)
-            # 如果用户在线则踢下线
-            await self.redis_conn.delete(f'app:user:current_user:{user_id}')
+            res = await self.User.filter(id=user_id).update(**data.model_dump(exclude_unset=True),
+                                                            updated_at=datetime.now(timezone('UTC')),
+                                                            updated_by_id=current_user.id)
+            logger.info(
+                f'用户【id:{current_user.id} username:{current_user.username}】 更新用户【id:{user_id}】信息，更新{res}行')
+            # 如果更新了内容，用户在线则踢下线
+            if res:
+                await self.redis_conn.delete(f'app:user:current_user:{user_id}')
         else:
             raise UserNotFoundError('用户不存在或用户为系统保留用户。')
 
     # 修改用户拥有的角色
-    async def update_user_roles(self, user_id: int, role_ids: list[int]):
+    async def update_user_roles(self, user_id: int, role_ids: list[int], current_user: CurrentUserDM) -> None:
         """
         修改用户拥有的角色
         Args:
@@ -319,14 +334,27 @@ class UserService:
         """
         # 判断是否为系统保留用户
         if await self.User.filter(id=user_id, is_system=False).exists():
-            # 挑选出有效role_id
-            if valid_role_ids := await self.Role.filter(id__in=role_ids, is_system=False).values_list('id', flat=True):
-                # 更改写入user_role表
-                await self.update_user_roles_by_ids(user_id, valid_role_ids)
-                # 如果用户在线则踢下线
-                await self.redis_conn.delete(f'app:user:current_user:{user_id}')
+            # 判断是否为情况目标用户的角色的情况
+            if role_ids:
+                # 挑选出有效role_id
+                if valid_role_ids := await self.Role.filter(id__in=role_ids, is_system=False).values_list('id',
+                                                                                                          flat=True):
+                    # 更改写入user_role表
+                    create_count, delete_count = await self.update_user_roles_by_ids(user_id, valid_role_ids)
+                    logger.info(
+                        f'用户【id:{current_user.id}】 分配用户【id:{user_id}】角色【ids:{valid_role_ids}】 更新{delete_count + create_count}行')
+                    # 如果有更改，将用户踢下线
+                    if delete_count or create_count:
+                        await self.redis_conn.delete(f'app:user:current_user:{user_id}')
+                else:
+                    raise RoleNotFoundError('角色不存在或角色为系统保留角色。')
             else:
-                raise RoleNotFoundError('角色不存在或角色为系统保留角色。')
+                # 清空目标用户的角色
+                count = await self.User_Role.filter(user_id=user_id).delete()
+                logger.info(f'用户【id:{current_user.id}】 分配用户【id:{user_id}】角色【ids:[]】 更新{count}行')
+                # 如果有更改，将用户踢下线
+                if count:
+                    await self.redis_conn.delete(f'app:user:current_user:{user_id}')
         else:
             raise UserNotFoundError('用户不存在或用户为系统保留用户。')
 
@@ -417,6 +445,7 @@ class UserService:
         Args:
             role_id:
             data:
+            current_user:
 
         Returns:
         Raises:
@@ -436,6 +465,7 @@ class UserService:
         Args:
             role_id:
             permission_ids:
+            current_user:
 
         Returns:
         Raises:
@@ -447,9 +477,15 @@ class UserService:
             # 筛选有效的permission_ids
             if valid_permission_ids := await self.Permission.filter(id__in=permission_ids).values_list(
                     'id', flat=True):
-                await self.update_role_permissions_by_ids(role_id, valid_permission_ids)
+                create_count, delete_count = await self.update_role_permissions_by_ids(role_id, valid_permission_ids)
                 logger.info(
-                    f'用户【id:{current_user.id} username:{current_user.username}】 更改角色【id:{role_id}】 权限【ids:{valid_permission_ids}】')
+                    f'用户【id:{current_user.id} username:{current_user.username}】 更改角色【id:{role_id}】 权限【ids:{valid_permission_ids}】 更新{create_count + delete_count}行')
+                # 拥有该角色的用户踢下线
+                if create_count or delete_count:
+                    user_ids = await self.User_Role.filter(role_id=role_id).values_list('user_id', flat=True)
+                    # 判断user_ids是否为空，否则传入空参，delete函数会报错
+                    if user_ids:
+                        await self.redis_conn.delete(*[f'app:user:current_user:{user_id}' for user_id in user_ids])
             else:
                 raise PermissionNotFoundError
         else:
@@ -474,6 +510,16 @@ class UserService:
                                                                                                description=permission.description))
             result.append(resource_out)
         return GetAllPermissionsOutSchema(resources=result)
+
+    # 删除角色
+    async def delete_roles(self, role_ids: list[int], current_user: CurrentUserDM) -> None:
+        valid_role_ids = await self.Role.filter(id__in=role_ids, is_system=False).values_list('id', flat=True)
+        user_ids = await self.User_Role.filter(role_id__in=valid_role_ids).values_list('user_id', flat=True)
+
+        await self.Role.filter(id__in=valid_role_ids).delete()
+        logger.info(f'用户【id:{current_user.id}】 删除角色【ids:{valid_role_ids}】')
+        # 拥有该角色的用户踢下线
+        await self.redis_conn.delete(*[f'app:user:current_user:{user_id}' for user_id in user_ids])
 
 
 user_service = UserService()

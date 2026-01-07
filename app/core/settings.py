@@ -29,14 +29,10 @@ class GlobalSettings(BaseSettings):
     # docs url
     docs_url : str = None
     redoc_url : str = None
+
     # cors
     cors_allowed_origins : list[str] | None = None
-    # orm配置
-    tortoise_orm_config: dict | None = None
-    # redis配置
-    redis_config: dict | None = None
-    # redis中token键值的过期时间 秒
-    redis_key_token_ex: int | None = None
+
     # jwt配置
     jwt_secret_key: str | None = None
     jwt_algorithm: str = 'HS256'
@@ -47,6 +43,15 @@ class GlobalSettings(BaseSettings):
 
     # log文件位置
     logs_path: Path = Path('./logs')
+
+    # orm配置
+    tortoise_orm_config: dict | None = None
+
+    # redis配置
+    redis_config: dict | None = None
+    # redis中token键值的过期时间 秒
+    redis_key_token_ex: int | None = None
+
 
     def __init__(self):
         super().__init__()

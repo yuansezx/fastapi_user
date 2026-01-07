@@ -8,7 +8,7 @@ from app.user.exceptions import UserInactiveError, UserPasswordIncorrectError, U
     RoleNotFoundError, PermissionNotFoundError
 from app.user.schemas import UserLoginResSchema, CreateUserReqSchema, CreateUserResSchema, GetUsersResSchema, \
     CreateRoleReqSchema, UpdateUserReqSchema, UpdateUserInSchema, GetRolesResSchema, GetRolePermissionsResSchema, \
-    UpdateRoleReqSchema, GetAllPermissionsResSchema
+    UpdateRoleReqSchema, GetAllPermissionsResSchema, UserDataResSchema
 
 user_router = APIRouter()
 
@@ -56,8 +56,12 @@ async def get_users(page: int = Query(1, gt=0, description='请求第几页的�
                     page_size: int = Query(20, gt=0, le=100, description='每页显示多少条数据'),
                     order_by: list[str] = Query(['id'], description='排序方式'),
                     current_user=Depends(get_current_user({'users': 'read'}))):
-    users = await user_service.get_users(page, page_size, order_by)
-    return users
+    service_out = await user_service.get_users(page, page_size, order_by)
+    users = service_out.data
+    result_data = []
+    for user in users:
+        result_data.append(UserDataResSchema(**user.model_dump(exclude=['roles']),role_names=[role.name for role in user.roles]))
+    return GetUsersResSchema(**service_out.model_dump(exclude={'data'}),data=result_data)
 
 
 # 修改用户信息
@@ -75,9 +79,9 @@ async def update_user(user_id: int, data: UpdateUserReqSchema,
 @user_router.put('/user/{user_id}/roles', summary='更改用户拥有的角色', tags=['user:用户'],
                  status_code=status.HTTP_204_NO_CONTENT)
 async def update_user_roles(user_id: int, role_ids: list[int] = Body(),
-                            current_user=Depends(get_current_user({'users': 'update'}))):
+                            current_user=Depends(get_current_user({'users': 'update','roles': 'read'}))):
     try:
-        await user_service.update_user_roles(user_id, role_ids)
+        await user_service.update_user_roles(user_id, role_ids, current_user)
     except UserNotFoundError as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
     except RoleNotFoundError as e:
@@ -151,6 +155,18 @@ async def update_role_permissions(role_id: int, data: list[int] = Body(),
                  responses={200: {'model': GetAllPermissionsResSchema}})
 async def get_all_permissions(current_user=Depends(get_current_user({'roles': 'update'}, {'roles': 'create'}))):
     return await user_service.get_all_permissions()
+
+
+# 删除角色
+@user_router.delete('/roles/{role_id}', summary='删除单个角色', tags=['user:角色'],
+                    status_code=status.HTTP_204_NO_CONTENT)
+async def delete_role(role_id: int, current_user=Depends(get_current_user({'roles': 'delete'}))):
+    await user_service.delete_roles([role_id], current_user)
+
+
+@user_router.delete('/roles', summary='删除多个角色', tags=['user:角色'], status_code=status.HTTP_204_NO_CONTENT)
+async def delete_roles(role_ids: list[int] = Body(), current_user=Depends(get_current_user({'roles': 'delete'}))):
+    await user_service.delete_roles(role_ids, current_user)
 
 
 @user_router.post('/test', summary='测试', tags=['user:test'])

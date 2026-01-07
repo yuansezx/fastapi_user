@@ -21,10 +21,16 @@ class CreateUserInSchema(BaseModel):
     nickname: str | None = Field(None, max_length=20)
     password: str
     is_active: bool = False
-    role_ids: list[int] | None = None
 
+class RoleDataOutSchema(BaseModel):
+    id: int
+    name: str
+    description: str | None
+    is_system: bool
+    created_at: datetime
+    created_by_id: int
 
-class UserDataOutSchema(BaseModel):
+class GetUsersOut_DataSchema(BaseModel):
     id: int
     username: str
     nickname: str
@@ -35,6 +41,7 @@ class UserDataOutSchema(BaseModel):
     last_login_at: datetime | None
     created_by_id: int
     updated_by_id: int | None
+    roles: list[RoleDataOutSchema]
 
 
 class GetUsersOutSchema(BaseModel):
@@ -43,7 +50,7 @@ class GetUsersOutSchema(BaseModel):
     page: int
     page_size: int
     order_by: list[str]
-    data: list[UserDataOutSchema]
+    data: list[GetUsersOut_DataSchema]
 
 
 class CreateRoleInSchema(BaseModel):
@@ -58,14 +65,6 @@ class UpdateUserInSchema(BaseModel):
     password: str | None = None
     is_active: bool | None = None
     role_ids: list[int] | None = None
-
-class RoleDataOutSchema(BaseModel):
-    id: int
-    name: str
-    description: str | None
-    is_system: bool
-    created_at: datetime
-    created_by_id: int
 
 class GetRolesOutSchema(GetUsersOutSchema):
     data: list[RoleDataOutSchema]
@@ -125,9 +124,21 @@ class CreateUserReqSchema(CreateUserInSchema):
 class CreateUserResSchema(BaseModel):
     user_id: int
 
+class UserDataResSchema(BaseModel):
+    id: int
+    username: str
+    nickname: str
+    created_at: datetime
+    updated_at: datetime | None
+    is_active: bool
+    is_system: bool
+    last_login_at: datetime | None
+    created_by_id: int
+    updated_by_id: int | None
+    role_names: list[str]
 
 class GetUsersResSchema(GetUsersOutSchema):
-    pass
+    data: list[UserDataResSchema]
 
 
 class CreateRoleReqSchema(CreateRoleInSchema):
