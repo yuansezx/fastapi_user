@@ -7,8 +7,11 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
+.venv/
 
-.idea
+.idea/
 config_dev.yaml
+
+migrations/
+logs/
 
