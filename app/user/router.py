@@ -169,6 +169,6 @@ async def delete_roles(role_ids: list[int] = Body(), current_user=Depends(get_cu
     await user_service.delete_roles(role_ids, current_user)
 
 
-@user_router.post('/test', summary='测试', tags=['user:test'])
-async def test(current_user=Depends(get_current_user({'users': 'read', 'roles': 'delete'}, {'roles': 'create'}))):
-    return current_user
+# @user_router.post('/test', summary='测试', tags=['user:test'])
+# async def test(current_user=Depends(get_current_user({'users': 'read', 'roles': 'delete'}, {'roles': 'create'}))):
+#     return current_user

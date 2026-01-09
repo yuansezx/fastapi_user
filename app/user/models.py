@@ -17,6 +17,7 @@ class Resource(Model):
         }
 
 
+
 class Permission(Model):
     """权限表"""
     id = fields.IntField(pk=True)

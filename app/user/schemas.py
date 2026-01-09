@@ -2,6 +2,42 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+"""仓库层schemas"""
+class ResourceSchema(BaseModel):
+    id: int
+    code: str
+    name: str
+    description: str | None
+
+class PermissionSchema(BaseModel):
+    id: int
+    code: str
+    name: str
+    description: str | None
+    resource_id: int
+
+class UserSchema(BaseModel):
+    id: int
+    username: str
+    nickname: str
+    created_at: datetime
+    updated_at: datetime | None
+    is_active: bool
+    is_system: bool
+    last_login_at: datetime | None
+    created_by_id: int
+    updated_by_id: int | None
+
+class RoleSchema(BaseModel):
+    id: int
+    name: str
+    description: str | None
+    is_system: bool
+    created_at: datetime
+    created_by_id: int
+
+
+
 """服务层schemas"""
 
 class RegisterResourceIn_PermissionsSchema(BaseModel):
@@ -22,25 +58,10 @@ class CreateUserInSchema(BaseModel):
     password: str
     is_active: bool = False
 
-class RoleDataOutSchema(BaseModel):
-    id: int
-    name: str
-    description: str | None
-    is_system: bool
-    created_at: datetime
-    created_by_id: int
+class RoleDataOutSchema(RoleSchema):
+    pass
 
-class GetUsersOut_DataSchema(BaseModel):
-    id: int
-    username: str
-    nickname: str
-    created_at: datetime
-    updated_at: datetime | None
-    is_active: bool
-    is_system: bool
-    last_login_at: datetime | None
-    created_by_id: int
-    updated_by_id: int | None
+class GetUsersOut_DataSchema(UserSchema):
     roles: list[RoleDataOutSchema]
 
 

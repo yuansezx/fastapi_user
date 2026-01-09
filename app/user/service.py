@@ -521,5 +521,8 @@ class UserService:
         # 拥有该角色的用户踢下线
         await self.redis_conn.delete(*[f'app:user:current_user:{user_id}' for user_id in user_ids])
 
+    # # test
+    # async def user_test(self):
+    #     pass
 
 user_service = UserService()
